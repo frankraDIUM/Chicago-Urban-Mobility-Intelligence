@@ -23,19 +23,23 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------------------------
-# Enterprise UI Theme & Custom Styling (CSS)
+# UI Theme & Custom Styling (CSS)
 # ----------------------------------------------------------------------
+# Replace the CSS block at the top of your script with this updated snippet:
+
 st.markdown("""
 <style>
-/* Base Spacing */
+/* Base Spacing - increased top padding to prevent title clipping */
 .block-container {
-    padding-top: 1rem;
+    padding-top: 1.8rem;
     padding-bottom: 2rem;
 }
 
 h1 {
     color: #1565C0 !important;
     font-weight: 700 !important;
+    padding-top: 0.2rem;
+    margin-top: 0rem;
 }
 
 /* Metric Cards */
@@ -129,7 +133,7 @@ div[data-testid="stSidebar"] {
 """, unsafe_allow_html=True)
 
 st.markdown(
-    "<h1 style='font-size:1.75rem; margin-bottom:0.4rem;'>🚕 Chicago Urban Mobility Intelligence</h1>",
+    "<h1 style='font-size:1.75rem; margin-bottom:0.6rem; padding-top:0.2rem;'>🚕 Chicago Urban Mobility Intelligence</h1>",
     unsafe_allow_html=True
 )
 
