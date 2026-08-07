@@ -12,9 +12,6 @@ import joblib
 import xgboost as xgb
 from groq import Groq
 import re
-from pathlib import Path
-
-BASE_DIR = Path(__file__).parent
 
 st.set_page_config(
     page_title="Chicago Mobility Intelligence",
@@ -23,7 +20,7 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------------------------
-#  UI Theme & Custom Styling (CSS)
+# Enterprise UI Theme & Custom Styling (CSS)
 # ----------------------------------------------------------------------
 st.markdown("""
 <style>
@@ -126,6 +123,26 @@ div[data-testid="stSidebar"] {
     align-items: center;
 }
 
+/* Sidebar System Status Styling */
+.status-card {
+    background-color: #FFFFFF;
+    border: 1px solid #D0D7DE;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+.status-item {
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+.status-ok {
+    color: #166534;
+}
+.status-err {
+    color: #991B1B;
+}
+
 /* Footer Styling */
 .app-footer {
     border-top: 1px solid #E2E8F0;
@@ -148,42 +165,42 @@ st.markdown(
 # ----------------------------------------------------------------------
 @st.cache_data
 def load_data():
+    try:
+        comm = gpd.read_file('chicago_community_areas_with_residuals.geojson')
+        for col in comm.columns:
+            if pd.api.types.is_datetime64_any_dtype(comm[col]):
+                comm[col] = comm[col].astype(str)
 
-    geojson_path = BASE_DIR / "chicago_community_areas_with_residuals.geojson"
+        if 'trips_per_1000_people' in comm.columns:
+            comm['trips_per_1k_fmt'] = comm['trips_per_1000_people'].round(1)
+        if 'total_trips' in comm.columns:
+            comm['total_trips_fmt'] = comm['total_trips'].fillna(0).astype(int)
+        if 'residual' in comm.columns:
+            comm['residual_fmt'] = comm['residual'].fillna(0).astype(int)
+        if 'avg_satellite_proxy' in comm.columns:
+            comm['satellite_fmt'] = comm['avg_satellite_proxy'].round(2)
 
-    comm = gpd.read_file(geojson_path)
-    for col in comm.columns:
-        if pd.api.types.is_datetime64_any_dtype(comm[col]):
-            comm[col] = comm[col].astype(str)
-
-    if 'trips_per_1000_people' in comm.columns:
-        comm['trips_per_1k_fmt'] = comm['trips_per_1000_people'].round(1)
-    if 'total_trips' in comm.columns:
-        comm['total_trips_fmt'] = comm['total_trips'].fillna(0).astype(int)
-    if 'residual' in comm.columns:
-        comm['residual_fmt'] = comm['residual'].fillna(0).astype(int)
-    if 'avg_satellite_proxy' in comm.columns:
-        comm['satellite_fmt'] = comm['avg_satellite_proxy'].round(2)
-
-    data_df = comm.drop(columns=['geometry']).copy()
-    return comm, data_df
+        data_df = comm.drop(columns=['geometry']).copy()
+        return comm, data_df
+    except Exception as e:
+        st.error(f"Could not load spatial dataset (`chicago_community_areas_with_residuals.geojson`): {e}")
+        return gpd.GeoDataFrame(), pd.DataFrame()
 
 comm_areas, data_df = load_data()
-geo_json = json.loads(comm_areas.to_json())
+geo_json = json.loads(comm_areas.to_json()) if not comm_areas.empty else {}
 
 @st.cache_resource
 def load_temporal_model():
     try:
-        model_path = BASE_DIR / "taxi_temporal_model_native.pkl"
-        return joblib.load(model_path)
+        return joblib.load('taxi_temporal_model_native.pkl')
     except Exception as e:
-        st.error(e)
+        st.error(f"Could not load temporal XGBoost model (`taxi_temporal_model_native.pkl`): {e}")
         return None
 
 temporal_model = load_temporal_model()
 
 area_col = 'community' if 'community' in comm_areas.columns else 'pickup_community_area'
-area_list = sorted(comm_areas[area_col].unique().tolist())
+area_list = sorted(comm_areas[area_col].unique().tolist()) if not comm_areas.empty else []
 
 LAYER_OPTIONS = ["Total Taxi Trips", "Trips per 1,000 People", "Satellite Proxy", "Residuals", "None"]
 
@@ -209,7 +226,7 @@ if "latest_prediction" not in st.session_state:
 # Core Functions
 # ----------------------------------------------------------------------
 def predict_trips(area: str, hour: int, weekend: bool) -> int:
-    if temporal_model is None:
+    if temporal_model is None or comm_areas.empty:
         return -1
     try:
         area_id = comm_areas[comm_areas[area_col] == area]['pickup_community_area'].iloc[0]
@@ -226,6 +243,8 @@ def predict_trips(area: str, hour: int, weekend: bool) -> int:
         return -1
 
 def get_highest_demand_areas(n: int = 5) -> str:
+    if data_df.empty:
+        return "Dataset unavailable."
     top = data_df.nlargest(n, 'total_trips')[[area_col, 'total_trips', 'trips_per_1000_people']]
     lines = [
         f"{i+1}. {row[area_col]} — {int(row['total_trips']):,} trips "
@@ -246,6 +265,8 @@ def get_feature_importance() -> str:
     )
 
 def find_hidden_hotspots(n: int = 5) -> str:
+    if data_df.empty:
+        return "Dataset unavailable."
     hot = data_df.nlargest(n, 'residual')[[area_col, 'residual', 'total_trips']]
     lines = [
         f"{i+1}. {row[area_col]} — residual +{int(row['residual']):,} "
@@ -255,6 +276,8 @@ def find_hidden_hotspots(n: int = 5) -> str:
     return "Hidden hotspots (model under-predicts):\n" + "\n".join(lines)
 
 def get_area_stats(area: str) -> str:
+    if data_df.empty:
+        return "Dataset unavailable."
     row = data_df[data_df[area_col] == area]
     if row.empty:
         return f"Area '{area}' not found."
@@ -273,8 +296,12 @@ def get_area_stats(area: str) -> str:
 @st.cache_resource
 def get_groq_client():
     try:
-        return Groq(api_key=st.secrets["GROQ_API_KEY"])
-    except Exception:
+        if "GROQ_API_KEY" in st.secrets:
+            return Groq(api_key=st.secrets["GROQ_API_KEY"])
+        else:
+            return None
+    except Exception as e:
+        st.sidebar.error(f"Groq Client Error: {e}")
         return None
 
 client = get_groq_client()
@@ -404,8 +431,7 @@ def build_map(layer: str, basemap: str, highlight_area: str | None = None):
 
     m = folium.Map(location=[41.8781, -87.6298], zoom_start=11, tiles=tiles, attr=attr)
 
-    # Render data layer only if layer is not "None"
-    if layer != "None":
+    if layer != "None" and not comm_areas.empty:
         if layer == "Satellite Proxy":
             folium.Choropleth(
                 geo_data=geo_json, data=data_df,
@@ -474,8 +500,7 @@ def build_map(layer: str, basemap: str, highlight_area: str | None = None):
 
             add_custom_legend(m, title, bins, colors)
 
-    # Auto-zoom to highlighted area regardless of layer selection
-    if highlight_area:
+    if highlight_area and not comm_areas.empty:
         try:
             geom = comm_areas[comm_areas[area_col].str.lower() == highlight_area.strip().lower()]
             if not geom.empty:
@@ -485,6 +510,25 @@ def build_map(layer: str, basemap: str, highlight_area: str | None = None):
             pass
 
     return m
+
+# ----------------------------------------------------------------------
+# Sidebar System Status Panel
+# ----------------------------------------------------------------------
+st.sidebar.markdown("### System Status")
+
+status_data = "✓ Spatial dataset loaded" if not comm_areas.empty else "❌ Missing spatial GeoJSON"
+status_model = "✓ Temporal XGBoost loaded" if temporal_model is not None else "❌ Temporal model offline"
+status_ai = "✓ AI Analyst connected" if client is not None else "⚠️ Groq API key missing"
+status_map = "✓ Map engine ready"
+
+st.sidebar.markdown(f"""
+<div class="status-card">
+    <div class="status-item {'status-ok' if not comm_areas.empty else 'status-err'}">{status_data}</div>
+    <div class="status-item {'status-ok' if temporal_model is not None else 'status-err'}">{status_model}</div>
+    <div class="status-item {'status-ok' if client is not None else 'status-err'}">{status_ai}</div>
+    <div class="status-item status-ok">{status_map}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ----------------------------------------------------------------------
 # Navigation Tabs
@@ -790,11 +834,12 @@ with tab3:
 
     with col_tbl_res:
         st.markdown("##### Top Under-Predicted Neighborhoods")
-        top_hot = data_df.nlargest(6, 'residual')[[area_col, 'residual', 'total_trips']].copy()
-        top_hot.columns = ['Community Area', 'Residual (+Trips)', 'Observed Trips']
-        top_hot['Residual (+Trips)'] = top_hot['Residual (+Trips)'].map('{:,.0f}'.format)
-        top_hot['Observed Trips'] = top_hot['Observed Trips'].map('{:,.0f}'.format)
-        st.dataframe(top_hot, use_container_width=True, hide_index=True)
+        if not data_df.empty:
+            top_hot = data_df.nlargest(6, 'residual')[[area_col, 'residual', 'total_trips']].copy()
+            top_hot.columns = ['Community Area', 'Residual (+Trips)', 'Observed Trips']
+            top_hot['Residual (+Trips)'] = top_hot['Residual (+Trips)'].map('{:,.0f}'.format)
+            top_hot['Observed Trips'] = top_hot['Observed Trips'].map('{:,.0f}'.format)
+            st.dataframe(top_hot, use_container_width=True, hide_index=True)
         st.info("Positive residuals identify 'hidden hotspots' where non-residential factors (e.g. seasonal events, transient venues) drive demand above structural baseline expectations.")
 
     st.markdown("---")
@@ -811,22 +856,23 @@ with tab3:
             key="analytics_temp_area"
         )
 
-    hours = list(range(24))
-    weekday_preds = [predict_trips(temp_area, h, weekend=False) for h in hours]
-    weekend_preds = [predict_trips(temp_area, h, weekend=True) for h in hours]
+    if temp_area:
+        hours = list(range(24))
+        weekday_preds = [predict_trips(temp_area, h, weekend=False) for h in hours]
+        weekend_preds = [predict_trips(temp_area, h, weekend=True) for h in hours]
 
-    fig_temp = go.Figure()
-    fig_temp.add_trace(go.Scatter(x=hours, y=weekday_preds, mode='lines+markers', name='Weekday', line=dict(color='#1565C0', width=3)))
-    fig_temp.add_trace(go.Scatter(x=hours, y=weekend_preds, mode='lines+markers', name='Weekend', line=dict(color='#E65100', width=3, dash='dash')))
-    fig_temp.update_layout(
-        title=f"24-Hour Hourly Taxi Demand Profile — {temp_area}",
-        xaxis_title="Hour of Day (0 - 23)",
-        yaxis_title="Predicted Taxi Trips",
-        height=350,
-        margin=dict(l=20, r=20, t=40, b=20),
-        hovermode="x unified"
-    )
-    st.plotly_chart(fig_temp, use_container_width=True)
+        fig_temp = go.Figure()
+        fig_temp.add_trace(go.Scatter(x=hours, y=weekday_preds, mode='lines+markers', name='Weekday', line=dict(color='#1565C0', width=3)))
+        fig_temp.add_trace(go.Scatter(x=hours, y=weekend_preds, mode='lines+markers', name='Weekend', line=dict(color='#E65100', width=3, dash='dash')))
+        fig_temp.update_layout(
+            title=f"24-Hour Hourly Taxi Demand Profile — {temp_area}",
+            xaxis_title="Hour of Day (0 - 23)",
+            yaxis_title="Predicted Taxi Trips",
+            height=350,
+            margin=dict(l=20, r=20, t=40, b=20),
+            hovermode="x unified"
+        )
+        st.plotly_chart(fig_temp, use_container_width=True)
 
 # ===================== TAB 4: About the Model =====================
 with tab4:
@@ -943,5 +989,3 @@ st.markdown("""
     Built by Frank G. Asiamah &nbsp;|&nbsp; Python · Streamlit · GeoPandas · XGBoost · Folium · Groq LLM
 </div>
 """, unsafe_allow_html=True)
-
-st.sidebar.success("Chicago Mobility Intelligence ready")
