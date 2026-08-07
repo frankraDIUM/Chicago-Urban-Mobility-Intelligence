@@ -23,23 +23,29 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------------------------
-# UI Theme & Custom Styling (CSS)
+#  UI Theme & Custom Styling (CSS)
 # ----------------------------------------------------------------------
-# Replace the CSS block at the top of your script with this updated snippet:
-
 st.markdown("""
 <style>
-/* Base Spacing - increased top padding to prevent title clipping */
-.block-container {
-    padding-top: 1.8rem;
-    padding-bottom: 2rem;
+/* Hide/unblock Streamlit's default top header bar that overlaps content */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 1rem !important;
 }
 
+/* Force container down with ample clear margin */
+.block-container {
+    padding-top: 3rem !important;
+    padding-bottom: 2rem !important;
+}
+
+/* Ensure clean title line-height without top clipping */
 h1 {
     color: #1565C0 !important;
     font-weight: 700 !important;
-    padding-top: 0.2rem;
-    margin-top: 0rem;
+    margin-top: 0rem !important;
+    padding-top: 0rem !important;
+    line-height: 1.3 !important;
 }
 
 /* Metric Cards */
@@ -133,7 +139,7 @@ div[data-testid="stSidebar"] {
 """, unsafe_allow_html=True)
 
 st.markdown(
-    "<h1 style='font-size:1.75rem; margin-bottom:0.6rem; padding-top:0.2rem;'>🚕 Chicago Urban Mobility Intelligence</h1>",
+    "<h1 style='font-size:1.75rem; margin-bottom:0.6rem;'>🚕 Chicago Urban Mobility Intelligence</h1>",
     unsafe_allow_html=True
 )
 
