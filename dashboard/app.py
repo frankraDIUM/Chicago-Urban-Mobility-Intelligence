@@ -12,6 +12,9 @@ import joblib
 import xgboost as xgb
 from groq import Groq
 import re
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
 
 st.set_page_config(
     page_title="Chicago Mobility Intelligence",
@@ -135,7 +138,10 @@ st.markdown(
 # ----------------------------------------------------------------------
 @st.cache_data
 def load_data():
-    comm = gpd.read_file('chicago_community_areas_with_residuals.geojson')
+
+    geojson_path = BASE_DIR / "chicago_community_areas_with_residuals.geojson"
+
+    comm = gpd.read_file(geojson_path)
     for col in comm.columns:
         if pd.api.types.is_datetime64_any_dtype(comm[col]):
             comm[col] = comm[col].astype(str)
@@ -158,8 +164,10 @@ geo_json = json.loads(comm_areas.to_json())
 @st.cache_resource
 def load_temporal_model():
     try:
-        return joblib.load('taxi_temporal_model_native.pkl')
-    except Exception:
+        model_path = BASE_DIR / "taxi_temporal_model_native.pkl"
+        return joblib.load(model_path)
+    except Exception as e:
+        st.error(e)
         return None
 
 temporal_model = load_temporal_model()
