@@ -12,6 +12,9 @@ import joblib
 import xgboost as xgb
 from groq import Groq
 import re
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
 
 st.set_page_config(
     page_title="Chicago Mobility Intelligence",
@@ -166,7 +169,9 @@ st.markdown(
 @st.cache_data
 def load_data():
     try:
-        comm = gpd.read_file('chicago_community_areas_with_residuals.geojson')
+        geojson_path = BASE_DIR / "chicago_community_areas_with_residuals.geojson"
+        comm = gpd.read_file(geojson_path)
+
         for col in comm.columns:
             if pd.api.types.is_datetime64_any_dtype(comm[col]):
                 comm[col] = comm[col].astype(str)
@@ -192,7 +197,8 @@ geo_json = json.loads(comm_areas.to_json()) if not comm_areas.empty else {}
 @st.cache_resource
 def load_temporal_model():
     try:
-        return joblib.load('taxi_temporal_model_native.pkl')
+        model_path = BASE_DIR / "taxi_temporal_model_native.pkl"
+        return joblib.load(model_path)
     except Exception as e:
         st.error(f"Could not load temporal XGBoost model (`taxi_temporal_model_native.pkl`): {e}")
         return None
@@ -516,9 +522,9 @@ def build_map(layer: str, basemap: str, highlight_area: str | None = None):
 # ----------------------------------------------------------------------
 st.sidebar.markdown("### System Status")
 
-status_data = "✓ Spatial dataset loaded" if not comm_areas.empty else "❌ Missing spatial GeoJSON"
-status_model = "✓ Temporal XGBoost loaded" if temporal_model is not None else "❌ Temporal model offline"
-status_ai = "✓ AI Analyst connected" if client is not None else "⚠️ Groq API key missing"
+status_data = "✓ Spatial dataset loaded" if not comm_areas.empty else " Missing spatial GeoJSON"
+status_model = "✓ Temporal XGBoost loaded" if temporal_model is not None else " Temporal model offline"
+status_ai = "✓ AI Analyst connected" if client is not None else " Groq API key missing"
 status_map = "✓ Map engine ready"
 
 st.sidebar.markdown(f"""
