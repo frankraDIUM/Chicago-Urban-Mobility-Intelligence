@@ -1,5 +1,9 @@
 # 🚕 Chicago Urban Mobility Intelligence Platform
-This project analyzes urban mobility patterns in Chicago by combining satellite imagery (Sentinel-2), OpenStreetMap road data, population density, business licenses/POI data, and a large Chicago taxi dataset (~14 million trips in 2024–early 2026).
+A production-ready geospatial analytics platform that combines satellite imagery, machine learning, residual diagnostics, and an LLM-powered spatial analyst for urban mobility forecasting in Chicago.
+
+The system integrates multi-source spatial data, static and temporal XGBoost models, interactive mapping, and a tool-using conversational agent into a single Streamlit application.
+
+Access the app here 👉:  https://bit.ly/4wNJQx1
 
 
 ---
@@ -13,54 +17,93 @@ Dashboard Preview
 
 
 
+## Overview
 
-*1. Objectives*
+**Chicago Urban Mobility Intelligence** is an end-to-end decision-support platform for exploring and forecasting taxi demand across Chicago’s 77 community areas.
 
-- Detect and quantify vehicle density proxies from Sentinel-2 imagery
-- Analyze spatiotemporal mobility trends using taxi data as ground truth
-- Identify congestion hotspots and hidden demand areas
-- Build predictive models for taxi trip volume (static + temporal)
-- Evaluate the added value of satellite-derived features
+It brings together:
+- Sentinel-2 satellite-derived vehicle density proxies
+- 14M+ Chicago taxi trip records
+- OpenStreetMap road network and business/POI data
+- Population density (WorldPop)
+- Static (community-area) and temporal (hourly) XGBoost models
+- Residual analysis for hidden demand hotspots
+- An LLM-powered AI Mobility Analyst with tool calling
 
+The platform is designed for both research insight and operational exploration (maps, forecasts, and conversational spatial analysis).
 
-*2. Data Sources*
+---
 
-- Satellite: Sentinel-2 Level-2A (10m resolution: B02, B03, B04, B08)
-- Ground Truth: Chicago Taxi Trips 2024 (Parquet, ~14 million records)
-- Road Network: Illinois OSM extract (illinois-260330.osm.pbf)
-- Population: WorldPop 2020 (usa_ppp_2020_UNadj.tif)
-- POI / Business: Chicago Business Licenses dataset
-- Boundaries: Chicago Community Areas (77 areas)
+## Dashboard
 
-## Key Results
+The main **Dashboard** tab provides:
+- Interactive Folium maps with multiple layers (Total Taxi Trips, Trips per 1,000 People, Satellite Proxy, Residuals)
+- Custom basemap options (CartoDB Positron, Satellite, OpenStreetMap)
+- Quick Temporal Forecast panel (select community area, hour, and weekend flag)
+- Automatic map highlight and zoom to the predicted community area
+- Live prediction metric display
 
-- **Static Model** (community area level): R² = 0.666
-- **Temporal Model** (hourly prediction): **R² = 0.954**, MAE = 294 trips
-- **Strongest predictors**: Number of hotels, airport presence, distance to Loop
-- **Satellite proxy (10m)**: Very limited predictive power once destination features are included
+Users can explore spatial demand patterns and generate hourly forecasts in one interface.
 
-## Features
+---
 
-- Road mask & vehicle density proxy from Sentinel-2 (10m)
-- Hotspot analysis (Getis-Ord Gi*)
-- Residual analysis to find hidden demand
-- Interactive Streamlit dashboard
-- Temporal prediction tool (hour + day type)
+## AI Mobility Analyst
 
+The **AI Mobility Analyst** tab pairs an interactive map with a tool-using LLM agent (Groq / Llama 3.3).
 
+The agent can:
+- Predict hourly taxi demand for any community area
+- Retrieve highest-demand neighborhoods
+- Report spatial model feature importance
+- Identify hidden hotspots (positive residuals)
+- Return detailed statistics for a selected area
+- Automatically update map layer and focus based on the query
 
-## Tech Stack
+Responses are analytical (not raw tool dumps) and oriented toward transportation planning insight.
 
-- **Python** 3.11
-- Geospatial: GeoPandas, Rasterio, Folium, Streamlit-Folium
-- ML: XGBoost, Scikit-learn
-- Data: PyArrow, Pandas
+---
 
-##  Main Findings
+## Methodology
 
-1. Taxi demand is strongly **destination-driven** (hotels, airports, restaurants, bars).
-2. Sentinel-2 at 10m resolution provides limited additional value for mobility prediction.
-3. O’Hare and Near North Side remain significant hidden hotspots.
-4. South Side neighborhoods are systematically over-predicted.
+### Data Sources
+- **Satellite**: Sentinel-2 MSI (10 m bands B02, B03, B04, B08) for texture / vehicle density proxies
+- **Mobility**: Chicago Taxi Trips (~14M records) as ground truth
+- **Roads**: OpenStreetMap network extract
+- **Population**: WorldPop 2020 gridded estimates
+- **POI / Business**: Chicago Business Licenses (hotels, bars, restaurants, etc.)
 
+### Modeling Pipeline
+1. Spatial feature engineering (POI counts, airport flag, distance to Loop, satellite proxy, population density)
+2. Static XGBoost model → annual demand per community area
+3. Residual analysis → hidden hotspots and over-prediction zones
+4. Temporal aggregation (hour × day type × community area)
+5. Temporal XGBoost model (native DMatrix) → hourly demand forecasts
+6. Interactive Streamlit interface + LLM agent with tool calling
+
+---
+
+## Results
+
+### Model Performance
+| Model              | Metric     | Value    |
+|--------------------|------------|----------|
+| Static (community) | R²         | 0.666    |
+| Static             | MAE        | 50,806 trips |
+| Temporal (hourly)  | R²         | **0.954** |
+| Temporal           | MAE        | **294 trips** |
+
+### Key Drivers (Static Model)
+1. **num_hotels** — 0.487  
+2. **is_airport** — 0.217  
+3. **dist_to_loop_km** — 0.082  
+4. **num_bars** — 0.062  
+5. **num_restaurants** — 0.055  
+
+**Main findings**
+- Taxi demand is strongly destination-driven (hotels and airports dominate).
+- Sentinel-2 10 m texture proxy adds limited predictive value once POI and location features are included.
+- O’Hare and Near North Side remain significant under-predicted (hidden) hotspots.
+- Several far South Side areas are systematically over-predicted.
+
+---
 
