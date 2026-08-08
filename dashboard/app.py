@@ -991,7 +991,7 @@ with tab4:
 # ----------------------------------------------------------------------
 st.markdown("""
 <div class="app-footer">
-    <b>Chicago Urban Mobility Intelligence v1.0</b><br>
+    <b>Chicago Urban Mobility Intelligence Platform v1.0</b><br>
     Built by Frank G. Asiamah &nbsp;|&nbsp; Python · Streamlit · GeoPandas · XGBoost · Folium · Groq LLM
 </div>
 """, unsafe_allow_html=True)
