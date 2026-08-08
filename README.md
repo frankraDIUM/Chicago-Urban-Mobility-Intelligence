@@ -5,6 +5,13 @@ The system integrates multi-source spatial data, static and temporal XGBoost mod
 
 Access the app here 👉:  https://bit.ly/4wNJQx1
 
+---
+Final platform view
+
+<p align="center">
+  <img src="https://github.com/frankraDIUM/Chicago-Urban-Mobility-Intelligence-Platform/blob/main/ch_mobi_ai.gif" />
+</p>
+
 
 ---
 Dashboard Preview
