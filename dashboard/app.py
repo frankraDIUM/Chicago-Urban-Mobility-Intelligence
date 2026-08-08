@@ -17,7 +17,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 
 st.set_page_config(
-    page_title="Chicago Mobility Intelligence",
+    page_title="Chicago Mobility Intelligence Platform",
     layout="wide",
     page_icon="🚕"
 )
